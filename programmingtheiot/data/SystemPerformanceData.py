@@ -23,25 +23,55 @@ class SystemPerformanceData(BaseIotData):
 	
 	def __init__(self, d = None):
 		super(SystemPerformanceData, self).__init__(name = ConfigConst.SYSTEM_PERF_MSG, typeID = ConfigConst.SYSTEM_PERF_TYPE, d = d)
-		pass
+		# Initialize instance variables with defaults
+		self.cpuUtil = ConfigConst.DEFAULT_VAL
+		self.memUtil = ConfigConst.DEFAULT_VAL
+		self.diskUtil = ConfigConst.DEFAULT_VAL
+
+		# If initialization data provided, update from it
+		if d is not None:
+			self._handleUpdateData(d)
 	
 	def getCpuUtilization(self):
-		pass
+		return self.cpuUtil
 	
 	def getDiskUtilization(self):
-		pass
+		return self.diskUtil
 	
 	def getMemoryUtilization(self):
-		pass
-	
+		return self.memUtil
+
 	def setCpuUtilization(self, cpuUtil):
-		pass
+		if cpuUtil is not None:
+			self.cpuUtil = self._clampUtilization(cpuUtil)
+			self.updateTimeStamp()
 	
 	def setDiskUtilization(self, diskUtil):
-		pass
+		if diskUtil is not None:
+			self.diskUtil = self._clampUtilization(diskUtil)
+			self.updateTimeStamp()
 	
 	def setMemoryUtilization(self, memUtil):
-		pass
+		if memUtil is not None:
+			self.memUtil = self._clampUtilization(memUtil)
+			self.updateTimeStamp()
+
+	def _clampUtilization(self, value: float) -> float:
+		"""
+		Ensure utilization values stay within 0-100 range.
+		"""
+		return max(0.0, min(100.0, float(value)))
 	
 	def _handleUpdateData(self, data):
-		pass
+		try:
+			if data and isinstance(data, SystemPerformanceData):
+				self.cpuUtil = data.getCpuUtilization()
+				self.memUtil = data.getMemoryUtilization()
+				self.diskUtil = data.getDiskUtilization()
+			elif data and isinstance(data, dict):
+				self.cpuUtil = data.get('cpuUtil', self.cpuUtil)
+				self.memUtil = data.get('memUtil', self.memUtil)
+				self.diskUtil = data.get('diskUtil', self.diskUtil)
+		except Exception as e:
+			print("SystemPerformanceData: Unexpected error in _handleUpdateData: " + str(e))
+			pass

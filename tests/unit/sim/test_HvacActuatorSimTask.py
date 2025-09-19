@@ -65,7 +65,6 @@ class HvacActuatorSimTaskTest(unittest.TestCase):
 		self.assertEqual(adr.getCommand(), ConfigConst.COMMAND_OFF)
 		logging.info("ActuatorData: " + str(adr))
 		
-	@unittest.skip("Ignore for now.")
 	def testUpdateActuatorRepeatCommands(self):
 		ad = ActuatorData(typeID = ConfigConst.HVAC_ACTUATOR_TYPE)
 		

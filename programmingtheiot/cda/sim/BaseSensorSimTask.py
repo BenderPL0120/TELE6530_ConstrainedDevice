@@ -16,6 +16,7 @@ import random
 import programmingtheiot.common.ConfigConst as ConfigConst
 
 from programmingtheiot.data.SensorData import SensorData
+from programmingtheiot.cda.sim.SensorDataGenerator import SensorDataSet
 
 class BaseSensorSimTask():
 	"""
@@ -23,20 +24,57 @@ class BaseSensorSimTask():
 	
 	"""
 
-	DEFAULT_MIN_VAL = 0.0
+	DEFAULT_MIN_VAL = ConfigConst.DEFAULT_VAL
 	DEFAULT_MAX_VAL = 1000.0
 	
 	def __init__(self, name = ConfigConst.NOT_SET, typeID: int = ConfigConst.DEFAULT_SENSOR_TYPE, dataSet = None, minVal: float = DEFAULT_MIN_VAL, maxVal: float = DEFAULT_MAX_VAL):
-		pass
+		self.name = name
+		self.typeID = typeID
+		self.dataSet = dataSet
+		self.minVal = minVal
+		self.maxVal = maxVal
+		
+		self.dataSetIndex = 0
+		self.latestSensorData = None
+		self.useRandomizer = (dataSet is None)
+		
+		# Validate min/max values
+		if self.minVal > self.maxVal:
+			self.minVal, self.maxVal = self.maxVal, self.minVal
+		
+		logging.info(f"Initialized {self.name} sensor simulator "
+		           f"(mode: {'random' if self.useRandomizer else 'dataset'})")
 	
 	def generateTelemetry(self) -> SensorData:
-		"""
-		Implement basic logging and SensorData creation. Sensor-specific functionality
-		should be implemented by sub-class.
+		sensorData = SensorData(typeID=self.typeID, name=self.name)
+		sensorVal = ConfigConst.DEFAULT_VAL
 		
-		A local reference to SensorData can be contained in this base class.
-		"""
-		pass
+		if self.useRandomizer:
+			sensorVal = random.uniform(self.minVal, self.maxVal)
+		else:
+			try:
+				# handle SensorDataSet
+				if hasattr(self.dataSet, 'getDataEntry'):
+					sensorVal = self.dataSet.getDataEntry(index=self.dataSetIndex)
+					dataSize = self.dataSet.getDataEntryCount()
+				# handle list or tuple
+				elif isinstance(self.dataSet, (list, tuple)):
+					sensorVal = self.dataSet[self.dataSetIndex]
+					dataSize = len(self.dataSet)
+				else:
+					raise TypeError(f"Unsupported dataset type: {type(self.dataSet)}")
+				
+				# loop the index
+				self.dataSetIndex = (self.dataSetIndex + 1) % dataSize
+					
+			except (IndexError, AttributeError, TypeError) as e:
+				logging.warning(f"Error reading dataset: {e}. Using default value.")
+				sensorVal = ConfigConst.DEFAULT_VAL
+		
+		sensorData.setValue(sensorVal)
+		self.latestSensorData = sensorData
+		
+		return self.latestSensorData
 	
 	def getTelemetryValue(self) -> float:
 		"""
@@ -44,17 +82,28 @@ class BaseSensorSimTask():
 		If SensorData hasn't yet been created, call self.generateTelemetry(), then return
 		its current value.
 		"""
-		pass
+		if self.latestSensorData is None:
+			self.generateTelemetry()
+		
+		return self.latestSensorData.getValue()
 	
 	def getLatestTelemetry(self) -> SensorData:
 		"""
 		This can return the current SensorData instance or a copy.
 		"""
-		pass
+		if self.latestSensorData is None:
+			self.generateTelemetry()
+		
+		return self.latestSensorData
 	
 	def getName(self) -> str:
-		pass
+		return self.name
 	
 	def getTypeID(self) -> int:
-		pass
+		return self.typeID
+	
+	def _getDataSetSize(self):
+			if hasattr(self, 'dataSet') and self.dataSet is not None:
+					return len(self.dataSet)
+			return 0
 	

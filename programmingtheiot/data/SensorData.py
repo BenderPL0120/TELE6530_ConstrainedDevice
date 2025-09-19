@@ -22,7 +22,12 @@ class SensorData(BaseIotData):
 		
 	def __init__(self, typeID: int = ConfigConst.DEFAULT_SENSOR_TYPE, name = ConfigConst.NOT_SET, d = None):
 		super(SensorData, self).__init__(name = name, typeID = typeID, d = d)
-		pass
+		# Initialize instance variables with defaults
+		self.value = ConfigConst.DEFAULT_VAL
+		
+		# If initialization data provided, update from it
+		if d is not None:
+			self._handleUpdateData(d)
 	
 	def getSensorType(self) -> int:
 		"""
@@ -33,10 +38,19 @@ class SensorData(BaseIotData):
 		return self.sensorType
 	
 	def getValue(self) -> float:
-		pass
+		return self.value
 	
 	def setValue(self, newVal: float):
-		pass
+		if newVal is not None:
+			self.value = float(newVal)
+			self.updateTimeStamp()
 		
 	def _handleUpdateData(self, data):
-		pass
+		try:
+			if data and isinstance(data, SensorData):
+				self.value = data.getValue()
+			elif data and isinstance(data, dict):
+				self.value = data.get('value', self.value)
+		except Exception as e:
+			print("SensorData: Unexpected error in _handleUpdateData: " + str(e))
+			pass

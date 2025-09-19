@@ -19,6 +19,7 @@ from time import sleep
 import programmingtheiot.common.ConfigConst as ConfigConst
 
 from programmingtheiot.common.ConfigUtil import ConfigUtil
+from programmingtheiot.cda.app.DeviceDataManager import DeviceDataManager
 from programmingtheiot.cda.system.SystemPerformanceManager import SystemPerformanceManager
 
 logging.basicConfig(format = '%(asctime)s:%(name)s:%(levelname)s:%(message)s', level = logging.DEBUG)
@@ -39,6 +40,7 @@ class ConstrainedDeviceApp():
 		
 		self.configUtil = ConfigUtil()
 		self.sysPerfMgr = SystemPerformanceManager()
+		self.dataMgr = DeviceDataManager()
 		self.isStarted = False
 
 	def isAppStarted(self) -> bool:
@@ -54,6 +56,7 @@ class ConstrainedDeviceApp():
 		logging.info("Starting CDA...")
 
 		self.sysPerfMgr.startManager()
+		self.dataMgr.startManager()
 		
 		self.isStarted = True
 		
@@ -67,6 +70,7 @@ class ConstrainedDeviceApp():
 		logging.info("CDA stopping...")
 
 		self.sysPerfMgr.stopManager()
+		self.dataMgr.stopManager()
 		
 		self.isStarted = False
 		
