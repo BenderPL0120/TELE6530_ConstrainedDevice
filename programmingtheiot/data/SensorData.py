@@ -44,6 +44,14 @@ class SensorData(BaseIotData):
 		if newVal is not None:
 			self.value = float(newVal)
 			self.updateTimeStamp()
+
+	def __str__(self) -> str:
+		"""
+		Override the base class __str__ to include the value field.
+		"""
+		base_str = super().__str__()
+		# Add the value field
+		return f"{base_str},value={self.value}"
 		
 	def _handleUpdateData(self, data):
 		try:

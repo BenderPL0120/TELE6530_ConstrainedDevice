@@ -85,8 +85,8 @@ class ActuatorAdapterManager(object):
 			responseData = self.humidifierActuator.updateActuator(data)
 		elif actuatorType == ConfigConst.HVAC_ACTUATOR_TYPE and self.hvacActuator:
 			responseData = self.hvacActuator.updateActuator(data)
-		# elif actuatorType == ConfigConst.LED_DISPLAY_ACTUATOR_TYPE and self.ledDisplayActuator:
-		#	responseData = self.ledDisplayActuator.updateActuator(data)
+		elif actuatorType == ConfigConst.LED_DISPLAY_ACTUATOR_TYPE and self.ledDisplayActuator:
+			responseData = self.ledDisplayActuator.updateActuator(data)
 		else:
 			logging.error(
 				"No valid actuator found for type ID: %s. Command ignored.", str(actuatorType))
@@ -105,16 +105,29 @@ class ActuatorAdapterManager(object):
 		return False
 
 	def _initEnvironmentalActuationTasks(self):
-		"""
-		Private helper method to initialize actuator tasks based on configuration.
-		"""
-		if not self.useEmulator:
-			# Load the environmental tasks for simulated actuation
-			logging.info("Initializing simulated environmental actuators...")
-			self.humidifierActuator = HumidifierActuatorSimTask()
-			self.hvacActuator = HvacActuatorSimTask()
-		else:
-			# Load the environmental tasks for emulated actuation
-			logging.info("Initializing emulated environmental actuators...")
-			# TODO: Add emulator implementation logic here
-			pass
+			"""
+			Private helper method to initialize actuator tasks based on configuration.
+			"""
+			if not self.useEmulator:
+				# Load the environmental tasks for simulated actuation
+				logging.info("Initializing simulated environmental actuators...")
+				self.humidifierActuator = HumidifierActuatorSimTask()
+				self.hvacActuator = HvacActuatorSimTask()
+			else:
+				# Load the environmental tasks for emulated actuation
+				logging.info("Initializing emulated environmental actuators...")
+				
+				# Dynamically load the HumidifierEmulatorTask
+				hueModule = import_module('programmingtheiot.cda.emulated.HumidifierEmulatorTask', 'HumidifierEmulatorTask')
+				hueClazz = getattr(hueModule, 'HumidifierEmulatorTask')
+				self.humidifierActuator = hueClazz()
+				
+				# Dynamically load the HvacEmulatorTask
+				hveModule = import_module('programmingtheiot.cda.emulated.HvacEmulatorTask', 'HvacEmulatorTask')
+				hveClazz = getattr(hveModule, 'HvacEmulatorTask')
+				self.hvacActuator = hveClazz()
+				
+				# Dynamically load the LedDisplayEmulatorTask
+				leDisplayModule = import_module('programmingtheiot.cda.emulated.LedDisplayEmulatorTask', 'LedDisplayEmulatorTask')
+				leClazz = getattr(leDisplayModule, 'LedDisplayEmulatorTask')
+				self.ledDisplayActuator = leClazz()
