@@ -21,6 +21,7 @@ from programmingtheiot.common.IDataMessageListener import IDataMessageListener
 
 from programmingtheiot.cda.system.SystemCpuUtilTask import SystemCpuUtilTask
 from programmingtheiot.cda.system.SystemMemUtilTask import SystemMemUtilTask
+from programmingtheiot.cda.system.SystemDiskUtilTask import SystemDiskUtilTask
 
 from programmingtheiot.data.SystemPerformanceData import SystemPerformanceData
 
@@ -40,6 +41,10 @@ class SystemPerformanceManager(object):
 		self.locationID = \
 		self.configUtil.getProperty( \
 			section = ConfigConst.CONSTRAINED_DEVICE, key = ConfigConst.DEVICE_LOCATION_ID_KEY, defaultVal = ConfigConst.NOT_SET)
+		
+		self.diskPath = \
+    self.configUtil.getProperty( \
+      section = ConfigConst.CONSTRAINED_DEVICE, key = 'diskMonitorPath', defaultVal = '/')
 	
 		if self.pollRate <= 0:
 			self.pollRate = ConfigConst.DEFAULT_POLL_CYCLES
@@ -53,12 +58,24 @@ class SystemPerformanceManager(object):
 		
 		self.cpuUtilTask = SystemCpuUtilTask()
 		self.memUtilTask = SystemMemUtilTask()
+		self.diskUtilTask = SystemDiskUtilTask(path=self.diskPath)
 
 	def handleTelemetry(self):
 		self.cpuUtilPct = self.cpuUtilTask.getTelemetryValue()
 		self.memUtilPct = self.memUtilTask.getTelemetryValue()
+		self.diskUtilPct = self.diskUtilTask.getTelemetryValue()
 
-		logging.debug('CPU utilization is %s percent, and memory utilization is %s percent.', str(self.cpuUtilPct), str(self.memUtilPct))
+		logging.debug('System Performance: CPU=%s%%, Memory=%s%%, Disk=%s%%', 
+                      str(self.cpuUtilPct), str(self.memUtilPct), str(self.diskUtilPct))
+		
+		sysPerfData = SystemPerformanceData()
+		sysPerfData.setLocationID(self.locationID)
+		sysPerfData.setCpuUtilization(self.cpuUtilPct)
+		sysPerfData.setMemoryUtilization(self.memUtilPct)
+		sysPerfData.setDiskUtilization(self.diskUtilPct)
+		
+		if self.dataMsgListener:
+			self.dataMsgListener.handleSystemPerformanceMessage(data = sysPerfData)
 
 	def setDataMessageListener(self, listener: IDataMessageListener) -> bool:
 		if listener:
