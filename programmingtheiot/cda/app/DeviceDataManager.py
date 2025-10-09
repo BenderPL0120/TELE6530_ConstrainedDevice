@@ -69,6 +69,17 @@ class DeviceDataManager(IDataMessageListener):
 		self.mqttClient = None
 		self.coapClient = None
 		self.coapServer = None
+
+		# Initialize MQTT client 
+		self.enableMqttClient = self.configUtil.getBoolean(
+			section=ConfigConst.CONSTRAINED_DEVICE, 
+			key=ConfigConst.ENABLE_MQTT_CLIENT_KEY
+		)
+
+		if self.enableMqttClient:
+			self.mqttClient = MqttClientConnector()
+			self.mqttClient.setDataMessageListener(self)
+			logging.info("MQTT client connector initialized")
 		
 		# Data caches
 		self.sensorDataCache = {}
@@ -266,6 +277,18 @@ class DeviceDataManager(IDataMessageListener):
 				
 			if self.sensorAdapterMgr:
 				self.sensorAdapterMgr.startManager()
+    
+	 		# connect MQTT client if enabled
+			if self.mqttClient:
+				logging.info("Connecting MQTT client...")
+				self.mqttClient.connectClient()
+
+				# Subscribe to actuator command topic
+				self.mqttClient.subscribeToTopic(
+					ResourceNameEnum.CDA_ACTUATOR_CMD_RESOURCE,
+					callback=self.handleActuatorCommandMessage,
+					qos=ConfigConst.DEFAULT_QOS
+				)
 				
 			logging.info("DeviceDataManager started successfully")
 		except Exception as e:
@@ -279,6 +302,13 @@ class DeviceDataManager(IDataMessageListener):
 		logging.info("Stopping DeviceDataManager...")
 		
 		try:
+	 		# disconnect MQTT client if enabled
+			if self.mqttClient:
+				logging.info("Disconnecting MQTT client...")
+				self.mqttClient.unsubscribeFromTopic(ResourceNameEnum.CDA_ACTUATOR_CMD_RESOURCE)
+				self.mqttClient.disconnectClient()
+				logging.info("MQTT client disconnected")
+		
 			if self.sysPerfMgr:
 				self.sysPerfMgr.stopManager()
 				
@@ -345,8 +375,18 @@ class DeviceDataManager(IDataMessageListener):
 		# Implementation reserved for Part III
 		# Will integrate with MQTT/CoAP clients when available
 		if self.mqttClient:
-			# TODO: Implement MQTT transmission
-			pass
+			try:
+				success = self.mqttClient.publishMessage(
+					resource=resourceName,
+					msg=msg,
+					qos=ConfigConst.DEFAULT_QOS
+				)
+				if success:
+					logging.debug(f"Message published to MQTT topic: {resourceName.value}")
+				else:
+					logging.warning(f"Failed to publish message to MQTT topic: {resourceName.value}")
+			except Exception as e:
+					logging.error(f"Error publishing to MQTT: {e}")
 			
 		if self.coapClient:
 			# TODO: Implement CoAP transmission
