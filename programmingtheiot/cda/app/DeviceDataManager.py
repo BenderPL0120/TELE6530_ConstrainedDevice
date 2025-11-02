@@ -17,6 +17,7 @@ import programmingtheiot.common.ConfigConst as ConfigConst
 from programmingtheiot.common.ConfigUtil import ConfigUtil
 from programmingtheiot.data.DataUtil import DataUtil
 
+from programmingtheiot.cda.connection.CoapServerAdapter import CoapServerAdapter
 from programmingtheiot.cda.connection.CoapClientConnector import CoapClientConnector
 from programmingtheiot.cda.connection.MqttClientConnector import MqttClientConnector
 
@@ -80,6 +81,17 @@ class DeviceDataManager(IDataMessageListener):
 			self.mqttClient = MqttClientConnector()
 			self.mqttClient.setDataMessageListener(self)
 			logging.info("MQTT client connector initialized")
+   
+		# Initialize CoAP server
+		self.enableCoapServer = self.configUtil.getBoolean(
+			section=ConfigConst.CONSTRAINED_DEVICE, 
+			key=ConfigConst.ENABLE_COAP_SERVER_KEY
+		)
+		
+		if self.enableCoapServer:
+			self.coapServer = CoapServerAdapter(dataMsgListener=self)
+			logging.info("CoAP server connector initialized")
+
 		
 		# Data caches
 		self.sensorDataCache = {}
@@ -289,6 +301,12 @@ class DeviceDataManager(IDataMessageListener):
 					callback=self.handleActuatorCommandMessage,
 					qos=ConfigConst.DEFAULT_QOS
 				)
+
+			# Start CoAP server if enabled
+			if self.coapServer:
+				logging.info("Starting CoAP server...")
+				self.coapServer.startServer()
+				logging.info("CoAP server started")
 				
 			logging.info("DeviceDataManager started successfully")
 		except Exception as e:
@@ -308,6 +326,12 @@ class DeviceDataManager(IDataMessageListener):
 				self.mqttClient.unsubscribeFromTopic(ResourceNameEnum.CDA_ACTUATOR_CMD_RESOURCE)
 				self.mqttClient.disconnectClient()
 				logging.info("MQTT client disconnected")
+    
+			# Stop CoAP server if enabled
+			if self.coapServer:
+				logging.info("Stopping CoAP server...")
+				self.coapServer.stopServer()
+				logging.info("CoAP server stopped")
 		
 			if self.sysPerfMgr:
 				self.sysPerfMgr.stopManager()
