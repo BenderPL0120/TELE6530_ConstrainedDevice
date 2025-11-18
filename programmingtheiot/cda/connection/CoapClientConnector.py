@@ -18,6 +18,7 @@ import traceback
 import asyncio
 
 from aiocoap import *
+from contextlib import suppress
 
 import programmingtheiot.common.ConfigConst as ConfigConst
 
@@ -229,6 +230,32 @@ class CoapClientConnector(IRequestResponseClient):
 			logging.warning(f"Failed to process Async POST request for path: {uriAndResourcePath}")
 			traceback.print_exception(type(e), e, e.__traceback__)
 	
+	async def _shutdownClient(self):
+		"""
+		Internal async method to shut down the client context.
+		"""
+		try:
+			# Cancel any pending observe tasks
+			logging.debug("Cancelling observe tasks...")
+			for task in self.observeTasks.values():
+				if task and not task.done():
+					task.cancel()
+					with suppress(asyncio.CancelledError):
+						await task
+			
+			self.observeTasks.clear()
+			self.observeRequests.clear()
+
+			if self.clientContext:
+				logging.info("Shutting down CoAP client context...")
+				await self.clientContext.shutdown()
+				self.clientContext = None
+				logging.info("CoAP client context shut down.")
+
+		except Exception as e:
+			logging.warning(f"Failed to shut down CoAP client context cleanly: {e}")
+			traceback.print_exception(type(e), e, e.__traceback__)
+  
 	async def _handlePutRequest(self, resourcePath: str = None, payload: str = None, enableCON: bool = False):
 		"""Handle PUT request"""
 		try:
@@ -496,3 +523,41 @@ class CoapClientConnector(IRequestResponseClient):
 		else:
 			logging.warning("Can't cancel OBSERVE - GET - no path provided.")
 			return False
+	
+	def disconnectClient(self):
+		"""
+		Shuts down the CoAP client connection and stops the event loop.
+		"""
+		logging.info("Disconnecting CoAP client...")
+		
+		try:
+			if hasattr(self, '_eventLoopThread') and self._eventLoopThread.is_running():
+				logging.debug("Scheduling async client shutdown.")
+				
+				# Schedule the async shutdown
+				future = asyncio.run_coroutine_threadsafe(
+					self._shutdownClient(),
+					self._eventLoopThread
+				)
+				
+				# Wait for the async shutdown to complete
+				future.result(timeout=5.0) 
+				
+				# Stop the event loop
+				logging.debug("Stopping event loop thread.")
+				self._eventLoopThread.call_soon_threadsafe(self._eventLoopThread.stop)
+			
+			if hasattr(self, '_executionThread') and self._executionThread.is_alive():
+				logging.debug("Waiting for execution thread to join...")
+				self._executionThread.join(timeout=2.0)
+    
+    	# Ensure event loop is closed
+			if hasattr(self, '_eventLoopThread') and not self._eventLoopThread.is_closed():
+					logging.debug("Closing event loop.")
+					self._eventLoopThread.close()
+
+			logging.info("CoAP client disconnected successfully.")
+
+		except Exception as e:
+			logging.error(f"Error during CoAP client disconnection: {e}")
+			traceback.print_exception(type(e), e, e.__traceback__)

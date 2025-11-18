@@ -64,41 +64,41 @@ class BaseActuatorSimTask():
 			
 			# Check if the command is a repeat of the last one; if so, ignore.
 			if curCommand == self.lastKnownCommand and curVal == self.lastKnownValue:
-				logging.debug(
-					f"New actuator command is a repeat. Ignoring: CMD={curCommand}, VAL={curVal}")
-				return None
-			else:
-				logging.debug(
-					f"New actuator command to be applied: CMD={curCommand}, VAL={curVal}")
-				
-				# Delegate to the appropriate handler
-				if curCommand == ConfigConst.COMMAND_ON:
-					logging.info("Activating actuator...")
-					statusCode = self._activateActuator(val = data.getValue(), stateData = data.getStateData())
-				elif curCommand == ConfigConst.COMMAND_OFF:
-					logging.info("Deactivating actuator...")
-					statusCode = self._deactivateActuator(val = data.getValue(), stateData = data.getStateData())
+				# Always process OFF commands even if they are repeats
+				if curCommand != ConfigConst.COMMAND_OFF:
+					logging.debug(f"New actuator command is a repeat. Ignoring: CMD={curCommand}, VAL={curVal}")
+					return None
 				else:
-					logging.warning(f"ActuatorData command is unknown. Ignoring: {curCommand}")
-					statusCode = -1
+					logging.debug(f"OFF command received - executing despite repeat")
 				
-				# Update the last known state
-				self.lastKnownCommand = curCommand
-				self.lastKnownValue = curVal
+			# Delegate to the appropriate handler
+			if curCommand == ConfigConst.COMMAND_ON:
+				logging.info("Activating actuator...")
+				statusCode = self._activateActuator(val = data.getValue(), stateData = data.getStateData())
+			elif curCommand == ConfigConst.COMMAND_OFF:
+				logging.info("Deactivating actuator...")
+				statusCode = self._deactivateActuator(val = data.getValue(), stateData = data.getStateData())
+			else:
+				logging.warning(f"ActuatorData command is unknown. Ignoring: {curCommand}")
+				statusCode = -1
 				
-				# Create the response object from the original command
-				actuatorResponse = ActuatorData()
-				actuatorResponse.updateData(data)
-				actuatorResponse.setStatusCode(statusCode)
-				actuatorResponse.setAsResponse()
-				
-				self.latestActuatorResponse.updateData(actuatorResponse)
-				
-				return actuatorResponse
+			# Update the last known state
+			self.lastKnownCommand = curCommand
+			self.lastKnownValue = curVal
+			
+			# Create the response object from the original command
+			actuatorResponse = ActuatorData()
+			actuatorResponse.updateData(data)
+			actuatorResponse.setStatusCode(statusCode)
+			actuatorResponse.setAsResponse()
+			
+			self.latestActuatorResponse.updateData(actuatorResponse)
+			
+			return actuatorResponse
 		
 		# Return None if data is invalid
 		return None
-		
+	
 	def _activateActuator(self, val: float = ConfigConst.DEFAULT_VAL, stateData: str = None) -> int:
 		"""
 		Implement basic logging. Actuator-specific functionality should be implemented by sub-class.

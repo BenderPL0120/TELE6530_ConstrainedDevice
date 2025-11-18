@@ -11,6 +11,7 @@
 # 
 
 import logging
+import concurrent.futures
 
 import programmingtheiot.common.ConfigConst as ConfigConst
 
@@ -81,7 +82,7 @@ class DeviceDataManager(IDataMessageListener):
 			self.mqttClient = MqttClientConnector()
 			self.mqttClient.setDataMessageListener(self)
 			logging.info("MQTT client connector initialized")
-   
+
 		# Initialize CoAP server
 		self.enableCoapServer = self.configUtil.getBoolean(
 			section=ConfigConst.CONSTRAINED_DEVICE, 
@@ -92,7 +93,16 @@ class DeviceDataManager(IDataMessageListener):
 			self.coapServer = CoapServerAdapter(dataMsgListener=self)
 			logging.info("CoAP server connector initialized")
 
+  	# Initialize CoAP client
+		self.enableCoapClient = self.configUtil.getBoolean(
+			section=ConfigConst.CONSTRAINED_DEVICE,
+			key=ConfigConst.ENABLE_COAP_CLIENT_KEY
+		)
 		
+		if self.enableCoapClient:
+			self.coapClient = CoapClientConnector(dataMsgListener=self)
+			logging.info("CoAP client connector initialized")
+
 		# Data caches
 		self.sensorDataCache = {}
 		self.actuatorResponseCache = {}
@@ -112,8 +122,22 @@ class DeviceDataManager(IDataMessageListener):
 		if self.enableActuation:
 			self.actuatorAdapterMgr = ActuatorAdapterManager(dataMsgListener=self)
 			logging.info("Local actuation capabilities enabled")
-		
-		# Load device-level control settings
+
+		# Load Humidity control settings
+		self.handleHumidityChangeOnDevice = self.configUtil.getBoolean(
+			ConfigConst.CONSTRAINED_DEVICE, 
+			ConfigConst.HANDLE_HUMIDITY_CHANGE_ON_DEVICE_KEY
+		)
+		self.triggerHumidifierFloor = self.configUtil.getFloat(
+			ConfigConst.CONSTRAINED_DEVICE, 
+			ConfigConst.TRIGGER_HUMIDIFIER_FLOOR_KEY
+		)
+		self.triggerHumidifierCeiling = self.configUtil.getFloat(
+			ConfigConst.CONSTRAINED_DEVICE, 
+			ConfigConst.TRIGGER_HUMIDIFIER_CEILING_KEY
+		)
+
+		# Load Temperature control settings
 		self.handleTempChangeOnDevice = self.configUtil.getBoolean(
 			ConfigConst.CONSTRAINED_DEVICE, 
 			ConfigConst.HANDLE_TEMP_CHANGE_ON_DEVICE_KEY
@@ -126,6 +150,23 @@ class DeviceDataManager(IDataMessageListener):
 			ConfigConst.CONSTRAINED_DEVICE, 
 			ConfigConst.TRIGGER_HVAC_TEMP_CEILING_KEY
 		)
+
+		# Load Pressure control settings
+		self.handlePressureChangeOnDevice = self.configUtil.getBoolean(
+			ConfigConst.CONSTRAINED_DEVICE, 
+			ConfigConst.HANDLE_PRESSURE_CHANGE_ON_DEVICE_KEY
+		)
+		self.triggerPressureFloor = self.configUtil.getFloat(
+			ConfigConst.CONSTRAINED_DEVICE, 
+			ConfigConst.TRIGGER_PRESSURE_FLOOR_KEY
+		)
+		self.triggerPressureCeiling = self.configUtil.getFloat(
+			ConfigConst.CONSTRAINED_DEVICE, 
+			ConfigConst.TRIGGER_PRESSURE_CEILING_KEY
+		)
+  
+		# Create a thread pool executor for handling upstream transmissions asynchronously
+		self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=5)
 		
 	def getLatestActuatorDataResponseFromCache(self, name: str = None) -> ActuatorData:
 		"""
@@ -160,21 +201,21 @@ class DeviceDataManager(IDataMessageListener):
 			return self.sysPerfDataCache[name]
 		return None
 	
-	def handleActuatorCommandMessage(self, data: ActuatorData) -> bool:
+	def handleActuatorCommandMessage(self, data: ActuatorData) -> ActuatorData:
 		"""
 		This callback method will be invoked by the connection that's handling
 		an incoming ActuatorData command message.
 		
 		@param data The incoming ActuatorData command message.
-		@return boolean
+		@return ActuatorData
 		"""
-		logging.info(f"Processing actuator command: {data}")
-		
 		if data:
-			logging.info("Forwarding actuator command to adapter manager")
+			logging.info(f"Processing actuator command message: {data}")
+		
+			# TODO: add further validation before sending the command
 			return self.actuatorAdapterMgr.sendActuatorCommand(data)
 		else:
-			logging.warning("Invalid actuator command (null). Ignoring.")
+			logging.warning("Received invalid ActuatorData command message. Ignoring.")
 			return None
 	
 	def handleActuatorCommandResponse(self, data: ActuatorData) -> bool:
@@ -289,18 +330,18 @@ class DeviceDataManager(IDataMessageListener):
 				
 			if self.sensorAdapterMgr:
 				self.sensorAdapterMgr.startManager()
-    
+		
 	 		# connect MQTT client if enabled
 			if self.mqttClient:
 				logging.info("Connecting MQTT client...")
 				self.mqttClient.connectClient()
 
-				# Subscribe to actuator command topic
-				self.mqttClient.subscribeToTopic(
-					ResourceNameEnum.CDA_ACTUATOR_CMD_RESOURCE,
-					callback=self.handleActuatorCommandMessage,
-					qos=ConfigConst.DEFAULT_QOS
-				)
+				# # Subscribe to actuator command topic
+				# self.mqttClient.subscribeToTopic(
+				# 	ResourceNameEnum.CDA_ACTUATOR_CMD_RESOURCE,
+				# 	callback=self.handleActuatorCommandMessage,
+				# 	qos=ConfigConst.DEFAULT_QOS
+				# )
 
 			# Start CoAP server if enabled
 			if self.coapServer:
@@ -326,7 +367,7 @@ class DeviceDataManager(IDataMessageListener):
 				self.mqttClient.unsubscribeFromTopic(ResourceNameEnum.CDA_ACTUATOR_CMD_RESOURCE)
 				self.mqttClient.disconnectClient()
 				logging.info("MQTT client disconnected")
-    
+		
 			# Stop CoAP server if enabled
 			if self.coapServer:
 				logging.info("Stopping CoAP server...")
@@ -338,6 +379,9 @@ class DeviceDataManager(IDataMessageListener):
 				
 			if self.sensorAdapterMgr:
 				self.sensorAdapterMgr.stopManager()
+    
+			if self.executor:
+					self.executor.shutdown(wait=True)
 				
 			logging.info("DeviceDataManager stopped successfully")
 		except Exception as e:
@@ -364,17 +408,30 @@ class DeviceDataManager(IDataMessageListener):
 	def _handleSensorDataAnalysis(self, data: SensorData):
 		"""
 		Call this from handleSensorMessage() to determine if there's
-		any action to take on the message. Steps to take:
-		1) Check config: Is there a rule or flag that requires immediate processing of data?
-		2) Act on data: If # 1 is true, determine what - if any - action is required, and execute.
-		"""
-		if not self.handleTempChangeOnDevice:
-			return
+		any action to take on the message.
+		"""		
+  	# 1. Humidity Analysis (New)
+		if self.handleHumidityChangeOnDevice and data.getTypeID() == ConfigConst.HUMIDITY_SENSOR_TYPE:
+			logging.debug(f"Analyzing humidity: {data.getValue()}")
 			
-		if data.getTypeID() == ConfigConst.TEMP_SENSOR_TYPE:
+			actuatorData = ActuatorData(typeID=ConfigConst.HUMIDIFIER_ACTUATOR_TYPE)
+			actuatorData.setLocationID(data.getLocationID())
+
+			if data.getValue() < self.triggerHumidifierFloor:
+				actuatorData.setCommand(ConfigConst.COMMAND_ON)
+				actuatorData.setValue(self.triggerHumidifierFloor) # Target Value
+			elif data.getValue() > self.triggerHumidifierCeiling:
+				actuatorData.setCommand(ConfigConst.COMMAND_OFF)
+			# Note: Logic can vary, typically humidifier turns ON when low, OFF when high/normal
+			
+			self.handleActuatorCommandMessage(actuatorData)
+   
+		# 2. Temperature Analysis (Existing logic, kept as is)
+		elif self.handleTempChangeOnDevice and data.getTypeID() == ConfigConst.TEMP_SENSOR_TYPE:
 			logging.debug(f"Analyzing temperature: {data.getValue()}")
 			
 			actuatorData = ActuatorData(typeID=ConfigConst.HVAC_ACTUATOR_TYPE)
+			actuatorData.setLocationID(data.getLocationID()) # Copy location
 			
 			if data.getValue() > self.triggerHvacTempCeiling:
 				actuatorData.setCommand(ConfigConst.COMMAND_ON)
@@ -386,18 +443,35 @@ class DeviceDataManager(IDataMessageListener):
 				actuatorData.setCommand(ConfigConst.COMMAND_OFF)
 			
 			self.handleActuatorCommandMessage(actuatorData)
-		
-	def _handleUpstreamTransmission(self, resourceName: ResourceNameEnum, msg: str):
+
+		# 3. Pressure Analysis (New)
+		elif self.handlePressureChangeOnDevice and data.getTypeID() == ConfigConst.PRESSURE_SENSOR_TYPE:
+			logging.debug(f"Analyzing pressure: {data.getValue()}")
+			
+			# Using LED for pressure alarm (matches Java logic)
+			actuatorData = ActuatorData(typeID=ConfigConst.LED_DISPLAY_ACTUATOR_TYPE)
+			actuatorData.setLocationID(data.getLocationID())
+
+			if data.getValue() < self.triggerPressureFloor or data.getValue() > self.triggerPressureCeiling:
+				actuatorData.setCommand(ConfigConst.COMMAND_ON)
+				actuatorData.setValue(1.0) # LED ON
+			else:
+				actuatorData.setCommand(ConfigConst.COMMAND_OFF)
+				actuatorData.setValue(0.0) # LED OFF
+			
+			self.handleActuatorCommandMessage(actuatorData)
+
+	def _executeUpstreamTransmission(self, resourceName: ResourceNameEnum, msg: str):
 		"""
-		Call this from handleActuatorCommandResponse(), handlesensorMessage(), and handleSystemPerformanceMessage()
-		to determine if the message should be sent upstream. Steps to take:
-		1) Check connection: Is there a client connection configured (and valid) to a remote MQTT or CoAP server?
-		2) Act on msg: If # 1 is true, send message upstream using one (or both) client connections.
+		This function contains the actual transmission logic and is designed
+		to be run in a separate thread by the ThreadPoolExecutor to avoid deadlocks.
 		"""
-		logging.debug(f"Preparing upstream transmission for {resourceName}")
+		logging.debug(f"Executing upstream transmission in thread for {resourceName}")
+	
+		# Track transmission results
+		transmission_success = False
 		
-		# Implementation reserved for Part III
-		# Will integrate with MQTT/CoAP clients when available
+  		# MQTT transmission (if enabled)
 		if self.mqttClient:
 			try:
 				success = self.mqttClient.publishMessage(
@@ -407,11 +481,47 @@ class DeviceDataManager(IDataMessageListener):
 				)
 				if success:
 					logging.debug(f"Message published to MQTT topic: {resourceName.value}")
+					transmission_success = True
 				else:
 					logging.warning(f"Failed to publish message to MQTT topic: {resourceName.value}")
 			except Exception as e:
 					logging.error(f"Error publishing to MQTT: {e}")
 			
-		if self.coapClient:
-			# TODO: Implement CoAP transmission
-			pass
+		# CoAP transmission (if enabled)
+		if self.coapClient and self.coapClient.isConnected():
+			try:
+				if resourceName in [ResourceNameEnum.CDA_SENSOR_MSG_RESOURCE, 
+														ResourceNameEnum.CDA_SYSTEM_PERF_MSG_RESOURCE]:
+					success = self.coapClient.sendPostRequest(
+						resource=resourceName,
+						payload=msg
+					)
+				else:
+					success = self.coapClient.sendPutRequest(
+						resource=resourceName,
+						payload=msg
+					)
+						
+				if success:
+					logging.debug(f"Message sent via CoAP to resource: {resourceName.value}")
+					transmission_success = True
+				else:
+					logging.warning(f"Failed to send message via CoAP to resource: {resourceName.value}")
+			except Exception as e:
+				logging.error(f"Error sending via CoAP: {e}")
+		
+		if not transmission_success:
+			logging.warning(f"No successful transmission for resource: {resourceName.value}")		
+	
+	def _handleUpstreamTransmission(self, resourceName: ResourceNameEnum, msg: str):
+		"""
+		Call this from handleActuatorCommandResponse(), handlesensorMessage(), and handleSystemPerformanceMessage()
+		This method now submits the transmission task to a thread pool executor
+		to avoid blocking the main (e.g., MQTT) thread.
+		"""
+		logging.debug(f"Submitting upstream transmission to executor for {resourceName}")
+		
+		# Submit the actual transmission logic to be run in a separate thread
+		self.executor.submit(self._executeUpstreamTransmission, resourceName, msg)
+
+	

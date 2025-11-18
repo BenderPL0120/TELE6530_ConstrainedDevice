@@ -272,9 +272,20 @@ PRESSURE_SIM_CEILING_KEY = 'pressureSimCeiling'
 TEMP_SIM_FLOOR_KEY       = 'tempSimFloor'
 TEMP_SIM_CEILING_KEY     = 'tempSimCeiling'
 
+# Humidity Control Keys
+HANDLE_HUMIDITY_CHANGE_ON_DEVICE_KEY = 'handleHumidityChangeOnDevice'
+TRIGGER_HUMIDIFIER_FLOOR_KEY   = 'triggerHumidifierFloor'
+TRIGGER_HUMIDIFIER_CEILING_KEY = 'triggerHumidifierCeiling'
+
+# Temperature Control Keys
 HANDLE_TEMP_CHANGE_ON_DEVICE_KEY = 'handleTempChangeOnDevice'
 TRIGGER_HVAC_TEMP_FLOOR_KEY   = 'triggerHvacTempFloor'
 TRIGGER_HVAC_TEMP_CEILING_KEY = 'triggerHvacTempCeiling'
+
+# Pressure Control Keys
+HANDLE_PRESSURE_CHANGE_ON_DEVICE_KEY = 'handlePressureChangeOnDevice'
+TRIGGER_PRESSURE_FLOOR_KEY     = 'triggerPressureFloor'
+TRIGGER_PRESSURE_CEILING_KEY   = 'triggerPressureCeiling'
 
 RUN_FOREVER_KEY    = 'runForever'
 TEST_EMPTY_APP_KEY = 'testEmptyApp'

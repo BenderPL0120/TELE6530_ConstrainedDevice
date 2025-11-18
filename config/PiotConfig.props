@@ -12,14 +12,14 @@
 #
 [Mqtt.GatewayService]
 credFile       = ./cred/PiotMqttLocalCred.props
-certFile       = ./cert/PiotMqttLocalCertFile.pem
+certFile       = ./cert/ca.crt
 host           = localhost
 port           = 1883
 securePort     = 8883
 defaultQoS     = 0
-keepAlive      = 60
+keepAlive      = 300
 enableAuth     = False
-enableCrypt    = False
+enableCrypt    = True
 
 #
 # CoAP client configuration information
@@ -37,17 +37,18 @@ enableCrypt    = False
 # CDA specific configuration information
 #
 [ConstrainedDevice]
+runForever       = True
 deviceLocationID = constraineddevice001
 enableEmulator   = True
-enableSenseHAT   = False
+enableSenseHAT   = True
 enableMqttClient = True
-enableCoapServer = True
+enableCoapServer = False
 enableCoapClient = False
-enableSystemPerformance = True
+enableSystemPerformance = False
 enableSensing    = True
 enableActuation = True
 enableLogging    = True
-pollCycleSecs    = 5
+pollCycleSecs    = 60
 testGdaDataPath  = /tmp/gda-data
 testCdaDataPath  = /tmp/cda-data
 testEmptyApp     = False
@@ -62,9 +63,17 @@ tempSimFloor       =   15.0
 tempSimCeiling     =   25.0
 
 # configurable limits for actuator triggers
+handleHumidityChangeOnDevice = True
+triggerHumidifierFloor       = 30.0
+triggerHumidifierCeiling     = 50.0
+
 handleTempChangeOnDevice = True
-triggerHvacTempFloor     = 18.0
+triggerHvacTempFloor     = 10.0
 triggerHvacTempCeiling   = 20.0
+
+handlePressureChangeOnDevice = True
+triggerPressureFloor         = 950.0
+triggerPressureCeiling       = 1050.0
 
 # camera settings
 streamHostAddr      = 127.0.0.1

@@ -41,7 +41,7 @@ class CoapClientPerformanceTest(unittest.TestCase):
 	def tearDown(self):
 		self.coapClient.disconnectClient()
 					
-	@unittest.skip("Ignore for now.")
+	# @unittest.skip("Ignore for now.")
 	def testGetRequestCon(self):
 		"""
 		Comment the annotation to perf test CON GET
@@ -50,7 +50,7 @@ class CoapClientPerformanceTest(unittest.TestCase):
 		
 		self._execTestGet(self.MAX_TEST_RUNS, True)
 
-	@unittest.skip("Ignore for now.")
+	# @unittest.skip("Ignore for now.")
 	def testGetRequestNon(self):
 		"""
 		Comment the annotation to perf test NON GET
@@ -59,7 +59,7 @@ class CoapClientPerformanceTest(unittest.TestCase):
 		
 		self._execTestGet(self.MAX_TEST_RUNS, False)
 
-	@unittest.skip("Ignore for now.")
+	# @unittest.skip("Ignore for now.")
 	def testPostRequestCon(self):
 		"""
 		Comment the annotation to perf test CON POST
@@ -68,7 +68,7 @@ class CoapClientPerformanceTest(unittest.TestCase):
 		
 		self._execTestPost(self.MAX_TEST_RUNS, True)
 
-	@unittest.skip("Ignore for now.")
+	# @unittest.skip("Ignore for now.")
 	def testPostRequestNon(self):
 		"""
 		Comment the annotation to perf test NON POST
@@ -77,7 +77,7 @@ class CoapClientPerformanceTest(unittest.TestCase):
 		
 		self._execTestPost(self.MAX_TEST_RUNS, False)
 
-	@unittest.skip("Ignore for now.")
+	# @unittest.skip("Ignore for now.")
 	def testPutRequestCon(self):
 		"""
 		Comment the annotation to perf test CON PUT
@@ -86,7 +86,7 @@ class CoapClientPerformanceTest(unittest.TestCase):
 		
 		self._execTestPut(self.MAX_TEST_RUNS, True)
 
-	@unittest.skip("Ignore for now.")
+	# @unittest.skip("Ignore for now.")
 	def testPutRequestNon(self):
 		"""
 		Comment the annotation to perf test NON PUT
@@ -131,8 +131,8 @@ class CoapClientPerformanceTest(unittest.TestCase):
 		startTime = time.time_ns()
 		
 		for seqNo in range(0, maxTestRuns):
-			self.coapClient.sendPostRequest(resource = ResourceNameEnum.CDA_SENSOR_MSG_RESOURCE, enableCON = useCon, payload = payload)
-			
+			self.coapClient.sendPutRequest(resource = ResourceNameEnum.CDA_SENSOR_MSG_RESOURCE, enableCON = useCon, payload = payload)
+    
 		endTime = time.time_ns()
 		elapsedMillis = (endTime - startTime) / self.NS_IN_MILLIS
 		

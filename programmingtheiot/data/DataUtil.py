@@ -125,6 +125,9 @@ class DataUtil():
 			if key in varStruct:
 				setattr(obj, key, jsonStruct[key])
 			else:
+				# Ignore timeStampMillis
+				if key == 'timeStampMillis':
+					continue
 				logging.warning("JSON data contains key not mappable to object: %s", key)
 
 	
