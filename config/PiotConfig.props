@@ -63,17 +63,25 @@ tempSimFloor       =   15.0
 tempSimCeiling     =   25.0
 
 # configurable limits for actuator triggers
-handleHumidityChangeOnDevice = True
+handleHumidityChangeOnDevice = False
 triggerHumidifierFloor       = 30.0
 triggerHumidifierCeiling     = 50.0
 
-handleTempChangeOnDevice = True
+handleTempChangeOnDevice = False
 triggerHvacTempFloor     = 10.0
 triggerHvacTempCeiling   = 20.0
 
-handlePressureChangeOnDevice = True
+handlePressureChangeOnDevice = False
 triggerPressureFloor         = 950.0
 triggerPressureCeiling       = 1050.0
+
+handleOrientationChangeOnDevice = False
+triggerOrientationFloor = -10.0
+triggerOrientationCeiling = 50.0
+
+handleMagneticChangeOnDevice = False
+triggerMagneticFloor = -50.0
+triggerMagneticCeiling = 50.0
 
 # camera settings
 streamHostAddr      = 127.0.0.1

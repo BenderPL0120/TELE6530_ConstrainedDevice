@@ -73,10 +73,10 @@ class BaseActuatorSimTask():
 				
 			# Delegate to the appropriate handler
 			if curCommand == ConfigConst.COMMAND_ON:
-				logging.info("Activating actuator...")
+				logging.info(f"Activating {self.simpleName} actuator...") 
 				statusCode = self._activateActuator(val = data.getValue(), stateData = data.getStateData())
 			elif curCommand == ConfigConst.COMMAND_OFF:
-				logging.info("Deactivating actuator...")
+				logging.info(f"Deactivating {self.simpleName} actuator...")
 				statusCode = self._deactivateActuator(val = data.getValue(), stateData = data.getStateData())
 			else:
 				logging.warning(f"ActuatorData command is unknown. Ignoring: {curCommand}")
